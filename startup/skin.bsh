@@ -1,0 +1,9 @@
+/* 
+ * INSTALLATION: Copy this script to "<user>/KeyDeveloper/scripting/startup"
+ *
+ * SAMPLE: Make the application window transparent, using SWT
+ */
+
+import org.eclipse.swt.graphics.*;
+
+app.getShell().setAlpha(224);
