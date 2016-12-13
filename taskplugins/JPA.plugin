@@ -1,0 +1,45 @@
+<plugin>
+	<uid>e0b26986-3672-442f-8ebb-552700a0c77e</uid>
+	<name>Generate JPA code</name>
+	<description>Generate JPA compliant Java code</description>
+	<category>Code Generators</category>
+
+	<properties>
+		<property>
+			<key>jpa.modelname</key>
+			<name>Model name</name>
+			<category>Model</category>
+			<type>java.lang.String</type>
+			<description>Name of the model to use as input</description>
+			<required>true</required>
+			<defaultValue></defaultValue>
+		</property>
+
+		<property>
+			<key>jpa.packagename</key>
+			<name>Package name</name>
+			<category>Model</category>
+			<type>java.lang.String</type>			
+			<description>Package name of generated artifacts</description>		
+			<defaultValue>generated.jpa</defaultValue>
+		</property>
+
+		<property>
+			<key>jpa.outputdirectory</key>
+			<name>Output directory</name>
+			<category>Output</category>
+			<type>java.lang.String</type>
+			<description>Output directory name. If the directory exists, it is deleted before code generation.</description>
+			<defaultValue>generated/java</defaultValue>
+		</property>
+
+		<property>
+			<key>jpa.header</key>
+			<name>File header</name>
+			<category>Output</category>
+			<type>java.lang.String</type>
+			<description>An optional file header</description>
+			<defaultValue>/* Generated file */</defaultValue>
+		</property>
+	</properties>
+</plugin>

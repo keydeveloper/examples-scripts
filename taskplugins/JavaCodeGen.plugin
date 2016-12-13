@@ -1,0 +1,45 @@
+<plugin>
+	<uid>e0b2c9c6-3c72-4c2f-8cbb-5c2700a0c77e</uid>
+	<name>Generate Java domain model</name>
+	<description>Generate Java domain model</description>
+	<category>Code Generators</category>
+
+	<properties>
+		<property>
+			<key>javagen.modelname</key>
+			<name>Model name</name>
+			<category>Model</category>
+			<type>java.lang.String</type>
+			<description>Name of the model to use as input</description>
+			<required>true</required>
+			<defaultValue></defaultValue>
+		</property>
+
+		<property>
+			<key>javagen.rootpackage</key>
+			<name>Root package name</name>
+			<category>Model</category>
+			<type>java.lang.String</type>			
+			<description>Root package name for generated artifacts</description>		
+			<defaultValue>com.codegen</defaultValue>
+		</property>
+
+		<property>
+			<key>javagen.outputdirectory</key>
+			<name>Output directory</name>
+			<category>Output</category>
+			<type>java.lang.String</type>
+			<description>Output directory name. If the directory exists, it is deleted before code generation.</description>
+			<defaultValue>generated/java</defaultValue>
+		</property>
+
+		<property>
+			<key>javagen.template</key>
+			<name>Template filename</name>
+			<category>Output</category>
+			<type>java.lang.String</type>
+			<description>StringTemplate group file</description>
+			<defaultValue>Java.stg</defaultValue>
+		</property>
+	</properties>
+</plugin>

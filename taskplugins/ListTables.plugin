@@ -1,0 +1,48 @@
+<plugin>
+	<uid>e0b11186-3772-442f-8ebb-552700a0c77f</uid>
+	<name>List objects in model</name>
+	<description>Find all the objects in a model and write their names to file</description>
+
+	<!-- Put the plugin in this category -->
+	<category>General</category>
+
+	<properties>
+		<property>
+			<key>listplugin.modelname</key>
+			<name>Model name</name>
+			<category>Model</category>
+			<!--type>com.keydeveloper.domain.config.SourceVisualModel</type-->
+			<type>java.lang.String</type>
+			<description>Name of the model to use as input</description>		
+			<required>true</required>
+			<defaultValue></defaultValue>
+		</property>
+
+		<property>
+			<key>listplugin.prefix</key>
+			<name>Prefix</name>
+			<category>Model</category>
+			<type>java.lang.String</type>			
+			<description>Prefix each output line with this string</description>		
+			<defaultValue></defaultValue>
+		</property>
+
+		<property>
+			<key>listplugin.filename</key>
+			<name>Filename</name>
+			<category>Output</category>
+			<type>java.lang.String</type>
+			<description>Output filename, "tables.txt" by default.</description>
+			<defaultValue>tmp.txt</defaultValue>
+		</property>
+
+		<property>
+			<key>listplugin.commaseparated</key>
+			<name>Comma separated</name>
+			<category>Output</category>
+			<type>java.lang.Boolean</type>
+			<description>If true, separate each item with a comma</description>
+			<defaultValue>true</defaultValue>
+		</property>
+	</properties>
+</plugin>

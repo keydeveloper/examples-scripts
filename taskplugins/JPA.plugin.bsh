@@ -1,0 +1,263 @@
+/*  
+ * INSTALLATION: Copy the JPA.* files to <user>\KeyDeveloper\scripting\taskplugins
+ *
+ * SAMPLE: Task plugin that generate JPA compliant domain models. This is a 
+ * plugin where all generation happens in the script. For an example of
+ * a StringTemplate based generator, see the JavaCodeGen plugin.
+ *
+ * The script generates a JPA domain model, using conventions where JPA
+ * annotations are missing. For instance, if the model designates 'id' as the default
+ * name for ID fields, then it's not necessary to annotate the model using @Id.
+ * 
+ * Likewise, OneToMany, ManyToOne, etc are automatically added to relations, including
+ * infering inverse relations. However, the model is free to override these annotations when
+ * this convention is not sufficient.
+ * 
+ * The generated files can be added to any JPA tooling framework, such as Hibernate 
+ * or EclipseLink. In the latter case, right click on the Eclipse project and select 
+ * JPA Tools | Generate tables from entities to create tables.
+ * 
+ * You may want to add eclipselink.ddl-generation = create-or-extend-tables property in
+ * Eclipselink to avoid dropping tables after model changes.
+ */
+
+var props = current.getTaskExecutor().getProperties();
+current.setActiveModel(props.get("jpa.modelname"));
+
+if (current.getVisualModel() == null)
+{
+	current.getTaskExecutor().getStatus().addError("Could not find model: '" + props.get("jpa.modelname") + "'");
+}
+
+gen = current.getGenerator();
+
+// Get model properties to drive the generation
+packageName =  props.get("jpa.packagename");
+output = props.get("jpa.outputdirectory");
+
+modelInfo = current.getVisualModel().getMetaModel().getPluginData();
+
+if (modelInfo != null)
+{
+	if (modelInfo.getPackageName() != null && modelInfo.getPackageName().length() > 0)
+	{
+		packageName = modelInfo.getPackageName();	
+	}
+	
+	if (modelInfo.getOutputDirectory() != null && modelInfo.getOutputDirectory().length() > 0)
+	{
+		output = modelInfo.getOutputDirectory();
+	}	
+}
+
+// Create output directory, removing existing
+gen.deleteDirectory(output, true);
+gen.createDirectory(output);
+
+// Generate classes
+for (e : current.getEntities(false)) 
+{
+	// Prepare a new class; this clears currently added properties
+	gen.startClass();
+	
+	content = props.get("jpa.header") + "\n";
+	content += "package "+packageName+";\n\n";
+	content += "import javax.persistence.*;\n\n";
+	
+	// Class annotations
+	if (e.getAnnotations() != null && !e.getAnnotations().isEmpty())
+	{
+		for (annotation : e.getAnnotations().asList())
+		{
+			content += annotation + "\n";
+		}
+	}
+	
+	if (!gen.hasAnnotation(e, "Entity"))
+	{
+		content +="@Entity\n";
+	}
+	
+	content += "public class "+e.getName()+" implements java.io.Serializable\n{\n";
+
+	current.getTaskExecutor().getStatus().addInfo("Generating JPA class " + e.getName());
+
+	// Fields
+	for (col : e.getColumns())
+	{
+		// hibernate -> java type
+		hasColumnAnnotation = false;
+		if (gen.hasAnnotations(col))
+		{
+			for (annotation : col.getAnnotations().asList())
+			{
+				if (annotation.startsWith("@Column"))
+				{
+					hasColumnAnnotation = true;
+				}
+
+				content += "\t" + annotation + "\n";
+			}
+		}				
+		
+		// Convention: if the @Id annotation is missing, but the column name matches the default id field, add it anyway.
+		if (!gen.hasAnnotation(col, "Id") && gen.isIdField(col))
+		{
+			content += "\t@Id\n";
+		}
+		
+		// Convention: Use identity generator
+		if (!gen.hasAnnotation(col, "GeneratedValue") && gen.isIdField(col))
+		{
+			content += "\t@GeneratedValue(strategy=GenerationType.IDENTITY)\n";
+		}
+		
+		type = gen.getJavaType(col);
+
+		// TODO: if Column(length=x) is missing for strings, use col#length
+		if (!hasColumnAnnotation)
+		{
+			if (type.equalsIgnoreCase("java.lang.String") && col.getColumnSize() != null)
+			{
+				if (col.getColumnSize().intValue() > 255)
+				{
+					content +="\t@Lob\n\t@Column(nullable="+col.getNullable().equals("YES")+")\n";
+				}
+				else
+				{
+					content +="\t@Column(length="+col.getColumnSize()+", nullable="+col.getNullable().equals("YES")+")\n";
+				}
+			}
+			else
+			{
+				content +="\t@Column(nullable="+col.getNullable().equals("YES")+")\n";
+			}
+
+			// TODO: precision annotation for numeric types?
+		}
+
+		
+		// Convention: for Date, add @Temporal(DATE) automatically (unless overridden)
+		if (type.equals("java.util.Date") && !gen.hasAnnotation(col, "Temporal"))
+		{
+			content += "\t@Temporal(TemporalType.DATE)\n";
+		}
+		
+		content += "\tprivate " + type  + " " + col.getName()+";\n\n";
+		
+		gen.addProperty(col.getName(), type);
+	}
+	
+	// Owned relations (must also generate code for inverse relations, i.e incoming bi-directional links)
+	for (rel : gen.getRelations(e))
+	{
+		type = rel.getTarget().getName();
+		
+		if (rel.getTargetRole().getCardinalityHigh() == -1)
+		{			
+			type = "java.util.Set<"+type+">";
+			
+			if (rel.isBidirectional() && rel.getSourceRole().getCardinalityHigh() == -1)
+			{
+				if (!gen.hasAnnotation(rel.getTargetRole(), "ManyToMany"))
+				{
+					content += "\t@ManyToMany\n";
+				}
+			}
+			else
+			{
+				if (!gen.hasAnnotation(rel.getTargetRole(), "OneToMany"))
+				{
+					content += "\t@OneToMany\n";
+				}
+			}
+		}
+		else
+		{
+			// If OneToOne is wanted instead, the annotation must be added manually
+			if (!gen.hasAnnotation(rel.getTargetRole(), "ManyToOne"))
+			{
+				content += "\t@ManyToOne";	
+				
+				if (rel.getTargetRole().getCardinalityLow() == 1)
+				{
+					content += "(optional=false)";
+				}
+				
+				content += "\n";
+			}
+		}
+		
+		// Target role annotations, if any (such as OrderBy for the collection)
+		// We do NOT include relationship annotations (ManyToOne, etc), since these were handled above.
+		if (gen.hasAnnotations(rel.getTargetRole()))
+		{
+			for (annotation : rel.getTargetRole().getAnnotations().asList())
+			{
+				if (!gen.isRelationAnnotation(annotation))
+				{
+					content += "\t" + annotation + "\n";
+				}
+			}
+		}		
+		
+		content += "\tprivate " + type + " " + rel.getTargetRole().getName() +";\n\n";	
+		
+		gen.addProperty(rel.getTargetRole().getName(), type);
+	}
+	
+	// Non-owned (bidirectional) relations where the current entity is target
+	for (rel : gen.getInverseRelations(e))
+	{
+		mappedBy = "mappedBy=\""+rel.getTargetRole().getName()+"\"";
+
+		type = rel.getSource().getName();
+		
+		if (rel.getSourceRole().getCardinalityHigh() == -1)
+		{				
+			if (rel.getTargetRole().getCardinalityHigh() == -1)
+			{
+				if (!gen.hasRelationAnnotation(rel.getSourceRole()))	
+				{
+					content += "\t@ManyToMany("+mappedBy+")\n";
+				}
+			}
+			else
+			{
+				if (!gen.hasRelationAnnotation(rel.getSourceRole()))
+				{
+					content += "\t@OneToMany("+mappedBy+")\n";
+				}
+			}
+			
+			type = "java.util.Set<"+type+">";
+		}
+		else if (rel.getTargetRole().getCardinalityHigh() == -1)
+		{
+			Script.stop("Invalid relation; the many-side must be the owning side");
+		}
+		else
+		{
+			if (!gen.hasRelationAnnotation(rel.getSourceRole()))	
+			{
+				content += "\t@OneToOne("+mappedBy+")\n";
+			}
+		}
+				
+		content += "\tprivate " + type + " " + rel.getSourceRole().getName() +";\n\n";
+		
+		gen.addProperty(rel.getSourceRole().getName(), type);								
+	}
+	
+	// Generate getters and setters for the properties
+	content += "\n"+gen.getGettersAndSetters();
+	
+
+	// End class
+	content += "}\n";
+	content = content.replaceAll("\n", System.lineSeparator());
+
+	// Write file to the project's content directory
+	gen.writeFile(output+"/domainmodel/"+e.getName()+".java", content);
+
+}// foreach class
